@@ -1,0 +1,117 @@
+"""Command line: collect new data, report row counts, load Parquet backfills."""
+
+import argparse
+import json
+import re
+import sys
+from datetime import date, timedelta
+from pathlib import Path
+
+import duckdb
+import pandas as pd
+
+from ingest import nemweb, openmeteo, state
+from ingest.fuel_map import load_fuel_map
+from ingest.http import fetch as default_fetch
+from ingest.sources import FOLDERS, NEMWEB_BASE, REGIONS, REGISTRATION_LIST_URL
+
+# Pre-dispatch runs issued ~11:30 and ~12:00 NEM time: their first period ends 12:00 / 12:30,
+# i.e. trading-day periods 16 and 17 (the trading day starts at 04:00).
+NOON_FILE = re.compile(r"PUBLIC_PREDISPATCHIS_\d{8}(1200|1230)_")
+NOON_PERIODS = ("16", "17")
+
+
+def predispatch_url_filter(url: str) -> bool:
+    return bool(NOON_FILE.search(url))
+
+
+def predispatch_keep(key: str, df: pd.DataFrame) -> pd.DataFrame:
+    return df[df["predispatchseqno"].str[-2:].isin(NOON_PERIODS)]
+
+
+def counts(con) -> dict[str, int]:
+    tables = con.execute("select table_schema || '.' || table_name from information_schema.tables "
+                         "where table_schema = 'raw' order by 1").fetchall()
+    return {t: con.execute(f"select count(*) from {t}").fetchone()[0] for (t,) in tables}
+
+
+def safe_to_upload(old: dict[str, int], new: dict[str, int]) -> bool:
+    return all(t in new and new[t] >= n for t, n in old.items())
+
+
+def refresh_fuel_map(con, fetch=default_fetch, max_age_days: int = 7) -> pd.DataFrame:
+    state.ensure_schema(con)
+    con.execute("create table if not exists raw.fuel_map"
+                "(duid varchar, regionid varchar, fuel varchar, loaded_at timestamp)")
+    age = con.execute("select date_diff('day', max(loaded_at), now()) from raw.fuel_map").fetchone()[0]
+    if age is None or age >= max_age_days:
+        fm = load_fuel_map(fetch(REGISTRATION_LIST_URL))
+        con.execute("delete from raw.fuel_map")  # reference data, not history: replace
+        con.register("_fm", fm)
+        con.execute("insert into raw.fuel_map select duid, regionid, fuel, now() from _fm")
+        con.unregister("_fm")
+    return con.execute("select duid, regionid, fuel from raw.fuel_map").df()
+
+
+def collect(con, fetch=default_fetch, max_files: int | None = None, today: date | None = None) -> dict:
+    today = today or date.today()
+    fmap = refresh_fuel_map(con, fetch=fetch)
+    results = {}
+    for source in ("dispatch", "rooftop_pv", "scada", "predispatch"):
+        kw = {}
+        if source == "predispatch":
+            kw = {"url_filter": predispatch_url_filter, "keep": predispatch_keep}
+        if source == "scada":
+            kw = {"fuel_map": fmap}
+        results[source] = nemweb.load_new_files(con, source, NEMWEB_BASE + FOLDERS[source],
+                                                fetch=fetch, max_files=max_files, **kw)
+    for region in REGIONS:
+        for kind, start, end in (("archive", today - timedelta(days=3), today - timedelta(days=1)),
+                                 ("forecast", today, today + timedelta(days=1))):
+            try:
+                df = openmeteo.fetch_temperatures(region, start, end, kind, fetch=fetch)
+                openmeteo.load_weather(con, df)
+            except Exception as e:  # noqa: BLE001 - weather gaps are tolerated and recorded
+                state.record_error(con, f"weather_{kind}", region, f"{type(e).__name__}: {e}")
+    return results
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(prog="ingest.cli")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    c = sub.add_parser("collect")
+    c.add_argument("--db", required=True)
+    c.add_argument("--init", action="store_true")
+    c.add_argument("--max-files", type=int)
+    n = sub.add_parser("counts")
+    n.add_argument("--db", required=True)
+    lp = sub.add_parser("load-parquet")
+    lp.add_argument("--db", required=True)
+    lp.add_argument("--table", required=True)
+    lp.add_argument("--path", required=True)
+    a = ap.parse_args(argv)
+
+    if a.cmd == "collect":
+        if not Path(a.db).exists() and not a.init:
+            print(f"{a.db} not found; pass --init to create a new database", file=sys.stderr)
+            return 2
+        with duckdb.connect(a.db) as con:
+            for src, r in collect(con, max_files=a.max_files).items():
+                print(f"{src}: loaded={r.loaded} skipped={r.skipped} failed={r.failed}")
+        return 0
+    if a.cmd == "counts":
+        with duckdb.connect(a.db, read_only=True) as con:
+            print(json.dumps(counts(con)))
+        return 0
+    if a.cmd == "load-parquet":
+        with duckdb.connect(a.db) as con:
+            state.ensure_schema(con)
+            df = pd.read_parquet(a.path).assign(source_file=Path(a.path).name,
+                                                loaded_at=pd.Timestamp.now())
+            print(f"{state.append(con, a.table, df)} rows -> {a.table}")
+        return 0
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -27,10 +27,13 @@ def list_files(folder_url: str, fetch=default_fetch) -> list[str]:
 
 
 def load_new_files(con, source: str, folder_url: str, fetch=default_fetch,
-                   max_files: int | None = None, keep=None, fuel_map=None) -> LoadResult:
+                   max_files: int | None = None, keep=None, fuel_map=None,
+                   url_filter=None) -> LoadResult:
     state.ensure_schema(con)
     result = LoadResult()
     for url in list_files(folder_url, fetch=fetch):
+        if url_filter is not None and not url_filter(url):
+            continue
         if state.already_loaded(con, url):
             result.skipped += 1
             continue
