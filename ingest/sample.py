@@ -75,7 +75,7 @@ def _synthetic(con, rng) -> None:
         for kind in ("archive", "forecast", "historical_forecast"):
             state.append(con, "raw.weather", pd.DataFrame({
                 "time": th, "region": r, "temperature_c": temps + rng.normal(0, 0.5, len(th)),
-                "kind": kind, "fetched_at": th - pd.Timedelta(hours=26)}))
+                "kind": kind, "fetched_at": th - pd.Timedelta(hours=40)}))
         state.append(con, "raw.predispatch_regionsum", _predispatch_rows(r))
 
 

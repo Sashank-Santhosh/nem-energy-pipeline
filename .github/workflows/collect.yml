@@ -22,7 +22,7 @@ jobs:
       - run: scripts/release_db.sh download nem.duckdb
       - run: uv run python -m ingest.cli counts --db nem.duckdb > old.json
       - run: uv run python -m ingest.cli collect --db nem.duckdb
-      - run: uv run dbt build --project-dir dbt --profiles-dir dbt --vars '{forecasts_ready: true}'
+      - run: uv run dbt build --project-dir dbt --profiles-dir dbt
       - run: uv run python -m ingest.cli counts --db nem.duckdb > new.json
       - run: uv run python -m ingest.cli guard --old old.json --new new.json
       - run: scripts/release_db.sh upload nem.duckdb

@@ -1,0 +1,28 @@
+name: forecast
+on:
+  schedule:
+    - cron: "5 2 * * *"   # 02:05 UTC = 12:05 NEM time (AEST, no daylight saving)
+  workflow_dispatch:
+concurrency:
+  group: nem-db          # shared with collect.yml
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  forecast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      NEM_DB: nem.duckdb
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --no-dev
+      - run: scripts/release_db.sh download nem.duckdb
+      - run: uv run python -m ingest.cli counts --db nem.duckdb > old.json
+      - run: uv run python -m forecast.cli daily --db nem.duckdb
+      - run: uv run dbt build --project-dir dbt --profiles-dir dbt --vars '{forecasts_ready: true}'
+      - run: uv run python -m ingest.cli counts --db nem.duckdb > new.json
+      - run: uv run python -m ingest.cli guard --old old.json --new new.json
+      - run: scripts/release_db.sh upload nem.duckdb

@@ -14,6 +14,7 @@ dependencies = [
     "streamlit>=1.40",
     "plotly>=5.24",
     "dbt-duckdb>=1.9",
+    "scikit-learn>=1.9.1",
 ]
 
 [dependency-groups]
