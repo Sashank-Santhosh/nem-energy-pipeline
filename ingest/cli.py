@@ -89,7 +89,16 @@ def main(argv: list[str] | None = None) -> int:
     lp.add_argument("--db", required=True)
     lp.add_argument("--table", required=True)
     lp.add_argument("--path", required=True)
+    g = sub.add_parser("guard", help="exit 1 if any raw table would shrink")
+    g.add_argument("--old", required=True)
+    g.add_argument("--new", required=True)
     a = ap.parse_args(argv)
+
+    if a.cmd == "guard":
+        old, new = (json.loads(Path(p).read_text()) for p in (a.old, a.new))
+        ok = safe_to_upload(old, new)
+        print("upload ok" if ok else f"upload refused: {old} -> {new}")
+        return 0 if ok else 1
 
     if a.cmd == "collect":
         if not Path(a.db).exists() and not a.init:

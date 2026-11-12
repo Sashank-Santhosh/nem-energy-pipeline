@@ -48,3 +48,12 @@ def test_sample_db_creates_missing_folder(tmp_path):
     out = tmp_path / "new" / "dir" / "s.duckdb"
     build_sample(out)
     assert out.exists()
+
+
+def test_guard_command_exit_codes(tmp_path):
+    old, new, bad = tmp_path / "old.json", tmp_path / "new.json", tmp_path / "bad.json"
+    old.write_text('{"raw.x": 5}')
+    new.write_text('{"raw.x": 6}')
+    bad.write_text('{"raw.x": 4}')
+    assert cli.main(["guard", "--old", str(old), "--new", str(new)]) == 0
+    assert cli.main(["guard", "--old", str(old), "--new", str(bad)]) == 1
