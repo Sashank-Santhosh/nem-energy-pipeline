@@ -1,3 +1,4 @@
+import os
 import shutil
 import zipfile
 
@@ -8,7 +9,9 @@ from ingest.fuel_map import aggregate_scada, load_fuel_map
 from ingest.mms import parse_mms
 from tests.conftest import FIX
 
-pytestmark = pytest.mark.skipif(shutil.which("java") is None, reason="Spark needs Java 17")
+pytestmark = pytest.mark.skipif(
+    shutil.which("java") is None or (os.name == "nt" and not os.environ.get("HADOOP_HOME")),
+    reason="Spark needs Java 17 (and Hadoop winutils on Windows); runs in Linux CI")
 
 
 def test_build_fuel_mix_matches_pandas(tmp_path):

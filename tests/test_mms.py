@@ -33,3 +33,8 @@ def test_ignores_comment_and_end_rows():
     t = parse_mms(data)
     assert list(t) == ["A.B"]
     assert t["A.B"].to_dict("records") == [{"x": "1", "y": "2"}]
+
+
+def test_parse_only_requested_tables():
+    tables = parse_mms((FIX / "dispatchis.zip").read_bytes(), only={"DISPATCH.PRICE"})
+    assert list(tables) == ["DISPATCH.PRICE"]

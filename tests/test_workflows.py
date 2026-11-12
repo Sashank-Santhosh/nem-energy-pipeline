@@ -9,7 +9,7 @@ WORKFLOWS = sorted((Path(__file__).resolve().parent.parent / ".github" / "workfl
 @pytest.mark.parametrize("path", WORKFLOWS, ids=lambda p: p.name)
 def test_workflow_is_valid_yaml_with_jobs(path):
     doc = yaml.safe_load(path.read_text())
-    assert "jobs" in doc and doc["jobs"]
+    assert doc.get("jobs")
 
 
 def test_writers_share_one_concurrency_group():

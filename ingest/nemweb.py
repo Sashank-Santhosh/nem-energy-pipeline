@@ -40,7 +40,7 @@ def load_new_files(con, source: str, folder_url: str, fetch=default_fetch,
         if max_files is not None and result.loaded + result.failed >= max_files:
             break
         try:
-            tables = parse_mms(fetch(url))
+            tables = parse_mms(fetch(url), only=set(TABLES[source]))
             if not any(k in tables for k in TABLES[source]):
                 raise ValueError("no expected tables in file")
             rows = 0

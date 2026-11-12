@@ -22,7 +22,8 @@ def iter_csv_members(data: bytes) -> Iterator[tuple[str, bytes]]:
                 yield name, inner
 
 
-def parse_mms(data: bytes) -> dict[str, pd.DataFrame]:
+def parse_mms(data: bytes, only: set[str] | None = None) -> dict[str, pd.DataFrame]:
+    """Parse every table, or just the `only` keys (big files carry tables we never use)."""
     rows: dict[str, list[list[str]]] = {}
     cols: dict[str, list[str]] = {}
     for _, member in iter_csv_members(data):
@@ -32,6 +33,9 @@ def parse_mms(data: bytes) -> dict[str, pd.DataFrame]:
                 continue
             if rec[0] == "I":
                 key = f"{rec[1]}.{rec[2]}".upper()
+                if only is not None and key not in only:
+                    key = None
+                    continue
                 cols.setdefault(key, [c.lower() for c in rec[4:]])
                 rows.setdefault(key, [])
             elif rec[0] == "D" and key is not None:

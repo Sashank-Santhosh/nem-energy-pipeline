@@ -57,3 +57,31 @@ def test_guard_command_exit_codes(tmp_path):
     bad.write_text('{"raw.x": 4}')
     assert cli.main(["guard", "--old", str(old), "--new", str(new)]) == 0
     assert cli.main(["guard", "--old", str(old), "--new", str(bad)]) == 1
+
+
+def test_backfill_nemweb_respects_since(tmp_path):
+    from pathlib import Path
+
+    from ingest.sources import ARCHIVE_FOLDERS, NEMWEB_BASE
+
+    fix = Path(__file__).parent / "fixtures" / "nemweb" / "dispatchis.zip"
+    folder = NEMWEB_BASE + ARCHIVE_FOLDERS["dispatch"]
+    old, new = folder + "PUBLIC_DISPATCHIS_20251101.zip", folder + "PUBLIC_DISPATCHIS_20260901.zip"
+    pages = {folder: f'<a href="{old}">a</a><a href="{new}">b</a>'.encode(),
+             old: fix.read_bytes(), new: fix.read_bytes()}
+    con = duckdb.connect(str(tmp_path / "b.duckdb"))
+    r = cli.backfill_nemweb(con, "dispatch", since="2026-06-01", fetch=lambda u, **_: pages[u])
+    assert (r.loaded, con.execute("select count(*) from raw.load_log").fetchone()[0]) == (1, 1)
+
+
+def test_weather_history_loads_every_region(tmp_path):
+    from datetime import date
+    from pathlib import Path
+
+    body = (Path(__file__).parent / "fixtures" / "openmeteo" / "archive_adelaide.json").read_bytes()
+    con = duckdb.connect(str(tmp_path / "w.duckdb"))
+    n = cli.weather_history(con, date(2026, 10, 3), date(2026, 10, 5), "historical_forecast",
+                            fetch=lambda u, **_: body)
+    assert n == 5 * 72
+    kinds = con.execute("select distinct kind from raw.weather").fetchall()
+    assert kinds == [("historical_forecast",)]

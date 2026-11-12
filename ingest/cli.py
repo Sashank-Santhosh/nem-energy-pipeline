@@ -13,12 +13,13 @@ import pandas as pd
 from ingest import nemweb, openmeteo, state
 from ingest.fuel_map import load_fuel_map
 from ingest.http import fetch as default_fetch
-from ingest.sources import FOLDERS, NEMWEB_BASE, REGIONS, REGISTRATION_LIST_URL
+from ingest.sources import ARCHIVE_FOLDERS, FOLDERS, NEMWEB_BASE, REGIONS, REGISTRATION_LIST_URL
 
 # Pre-dispatch runs issued ~11:30 and ~12:00 NEM time: their first period ends 12:00 / 12:30,
 # i.e. trading-day periods 16 and 17 (the trading day starts at 04:00).
 NOON_FILE = re.compile(r"PUBLIC_PREDISPATCHIS_\d{8}(1200|1230)_")
 NOON_PERIODS = ("16", "17")
+ARCHIVE_DATE = re.compile(r"_(\d{8})(?:_\d{8})?\.zip$", re.IGNORECASE)
 
 
 def predispatch_url_filter(url: str) -> bool:
@@ -76,6 +77,27 @@ def collect(con, fetch=default_fetch, max_files: int | None = None, today: date 
     return results
 
 
+def backfill_nemweb(con, source: str, since: str, fetch=default_fetch, fuel_map=None):
+    """Load archive files dated on or after `since` (YYYY-MM-DD) for one source."""
+    cutoff = since.replace("-", "")
+
+    def recent(url: str) -> bool:
+        m = ARCHIVE_DATE.search(url)
+        return bool(m) and m.group(1) >= cutoff
+
+    keep = predispatch_keep if source == "predispatch" else None
+    return nemweb.load_new_files(con, source, NEMWEB_BASE + ARCHIVE_FOLDERS[source], fetch=fetch,
+                                 keep=keep, fuel_map=fuel_map, url_filter=recent)
+
+
+def weather_history(con, start: date, end: date, kind: str, fetch=default_fetch) -> int:
+    rows = 0
+    for region in REGIONS:
+        df = openmeteo.fetch_temperatures(region, start, end, kind, fetch=fetch)
+        rows += openmeteo.load_weather(con, df)
+    return rows
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="ingest.cli")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -89,11 +111,29 @@ def main(argv: list[str] | None = None) -> int:
     lp.add_argument("--db", required=True)
     lp.add_argument("--table", required=True)
     lp.add_argument("--path", required=True)
+    bf = sub.add_parser("backfill-nemweb")
+    bf.add_argument("--db", required=True)
+    bf.add_argument("--source", required=True, choices=sorted(ARCHIVE_FOLDERS))
+    bf.add_argument("--since", required=True)
+    wh = sub.add_parser("weather-history")
+    wh.add_argument("--db", required=True)
+    wh.add_argument("--start", required=True, type=date.fromisoformat)
+    wh.add_argument("--end", required=True, type=date.fromisoformat)
+    wh.add_argument("--kind", required=True, choices=["archive", "historical_forecast"])
     g = sub.add_parser("guard", help="exit 1 if any raw table would shrink")
     g.add_argument("--old", required=True)
     g.add_argument("--new", required=True)
     a = ap.parse_args(argv)
 
+    if a.cmd == "backfill-nemweb":
+        with duckdb.connect(a.db) as con:
+            r = backfill_nemweb(con, a.source, a.since)
+            print(f"{a.source}: loaded={r.loaded} skipped={r.skipped} failed={r.failed}")
+        return 0
+    if a.cmd == "weather-history":
+        with duckdb.connect(a.db) as con:
+            print(f"{weather_history(con, a.start, a.end, a.kind)} weather rows")
+        return 0
     if a.cmd == "guard":
         old, new = (json.loads(Path(p).read_text()) for p in (a.old, a.new))
         ok = safe_to_upload(old, new)
