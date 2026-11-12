@@ -18,7 +18,7 @@ NEM_TZ_OFFSET = pd.Timedelta(hours=10)
 
 
 def nem_now() -> pd.Timestamp:
-    return pd.Timestamp.utcnow().tz_localize(None) + NEM_TZ_OFFSET
+    return pd.Timestamp.now('UTC').tz_localize(None) + NEM_TZ_OFFSET
 
 
 def main(argv: list[str] | None = None) -> int:
