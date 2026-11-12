@@ -10,15 +10,10 @@ import pandas as pd
 
 from forecast import store
 from forecast.backtest import rolling_backtest
-from forecast.daily import run_daily
+from forecast.daily import run_daily, run_if_due
 from forecast.metrics import mae, mape
 from ingest.sources import REGIONS
-
-NEM_TZ_OFFSET = pd.Timedelta(hours=10)
-
-
-def nem_now() -> pd.Timestamp:
-    return pd.Timestamp.now('UTC').tz_localize(None) + NEM_TZ_OFFSET
+from ingest.timeutil import nem_now
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -27,6 +22,8 @@ def main(argv: list[str] | None = None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     d = sub.add_parser("daily")
     d.add_argument("--db", required=True)
+    due = sub.add_parser("daily-if-due", help="forecast tomorrow once, after 13:00 NEM time")
+    due.add_argument("--db", required=True)
     b = sub.add_parser("backtest")
     b.add_argument("--db", required=True)
     b.add_argument("--months", type=int, default=6)
@@ -34,6 +31,9 @@ def main(argv: list[str] | None = None) -> int:
 
     with duckdb.connect(a.db) as con:
         store.ensure_tables(con)
+        if a.cmd == "daily-if-due":
+            print(f"wrote {run_if_due(con, nem_now())} forecast rows")
+            return 0
         if a.cmd == "daily":
             out = run_daily(con, nem_now())
             print(f"wrote {len(out)} forecast rows for {sorted(set(out['regionid']))}")

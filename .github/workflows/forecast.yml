@@ -1,7 +1,7 @@
 name: forecast
+# Manual re-run only: the hourly collect job makes the daily forecast (daily-if-due),
+# so a delayed or cancelled scheduled run can never skip a day.
 on:
-  schedule:
-    - cron: "5 3 * * *"   # 03:05 UTC = 13:05 NEM time (AEST, no daylight saving)
   workflow_dispatch:
 concurrency:
   group: nem-db          # shared with collect.yml

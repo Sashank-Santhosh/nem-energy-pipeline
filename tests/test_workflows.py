@@ -24,3 +24,11 @@ def test_workflows_run_shell_scripts_through_bash():
         for line in p.read_text().splitlines():
             if "scripts/" in line and ".sh" in line:
                 assert "bash scripts/" in line, f"{p.name}: {line.strip()}"
+
+
+def test_hourly_job_makes_the_daily_forecast():
+    collect = yaml.safe_load((WORKFLOWS[0].parent / "collect.yml").read_text())
+    runs = " ".join(str(s.get("run", "")) for s in collect["jobs"]["collect"]["steps"])
+    assert "forecast.cli daily-if-due" in runs
+    forecast = yaml.safe_load((WORKFLOWS[0].parent / "forecast.yml").read_text())
+    assert "schedule" not in forecast.get(True, forecast.get("on", {}))  # manual only now

@@ -8,7 +8,7 @@ import pandas as pd
 from forecast import model, store
 from forecast.backtest import _days
 from forecast.data import Inputs
-from forecast.features import FEATURES, issue_time_for
+from forecast.features import FEATURES, ISSUE_HOUR, issue_time_for
 from ingest.sources import REGIONS
 
 log = logging.getLogger(__name__)
@@ -49,3 +49,14 @@ def run_daily(con, now: pd.Timestamp) -> pd.DataFrame:
                 " naive_mw, created_at from _fc")
     con.unregister("_fc")
     return out
+
+
+def run_if_due(con, now: pd.Timestamp) -> int:
+    """Forecast tomorrow once per day, on the first run at or after the 13:00 issue time.
+    Runs inside the hourly job, so a delayed or cancelled scheduled run can't skip a day."""
+    issue = now.normalize() + pd.Timedelta(hours=ISSUE_HOUR)
+    if now < issue:
+        return 0
+    store.ensure_tables(con)
+    done = con.execute("select count(*) from forecasts.daily where issue_time = ?", [issue]).fetchone()[0]
+    return 0 if done else len(run_daily(con, now))

@@ -1,7 +1,7 @@
 """Hourly temperatures from Open-Meteo, always in NEM time (Australia/Brisbane, no DST)."""
 
 import json
-from datetime import date, datetime
+from datetime import date
 from typing import Literal
 from urllib.parse import urlencode
 
@@ -10,12 +10,13 @@ import pandas as pd
 from ingest import state
 from ingest.http import fetch as default_fetch
 from ingest.sources import CITY_COORDS, OPEN_METEO
+from ingest.timeutil import nem_now
 
 Kind = Literal["archive", "forecast", "historical_forecast"]
 
 
 def fetch_temperatures(region: str, start: date, end: date, kind: Kind,
-                       fetch=default_fetch) -> pd.DataFrame:
+                       fetch=default_fetch, now=nem_now) -> pd.DataFrame:
     lat, lon = CITY_COORDS[region]
     q = urlencode({"latitude": lat, "longitude": lon, "hourly": "temperature_2m",
                    "timezone": "Australia/Brisbane",
@@ -27,7 +28,7 @@ def fetch_temperatures(region: str, start: date, end: date, kind: Kind,
         "region": region,
         "temperature_c": pd.to_numeric(pd.Series(h["temperature_2m"]), errors="coerce"),
         "kind": kind,
-        "fetched_at": datetime.now(),
+        "fetched_at": now(),  # NEM time, so forecasts can be filtered by issue time
     })
 
 

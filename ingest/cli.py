@@ -14,6 +14,7 @@ from ingest import nemweb, openmeteo, state
 from ingest.fuel_map import load_fuel_map
 from ingest.http import fetch as default_fetch
 from ingest.sources import ARCHIVE_FOLDERS, FOLDERS, NEMWEB_BASE, REGIONS, REGISTRATION_LIST_URL
+from ingest.timeutil import nem_now
 
 # Pre-dispatch runs issued ~12:30 and ~13:00 NEM time: the first runs that cover all of tomorrow
 # (earlier runs stop at 04:00). Their first period ends 13:00 / 13:30, i.e. trading-day periods
@@ -62,7 +63,7 @@ def refresh_fuel_map(con, fetch=default_fetch, max_age_days: int = 7) -> pd.Data
 
 
 def collect(con, fetch=default_fetch, max_files: int | None = None, today: date | None = None) -> dict:
-    today = today or date.today()
+    today = today or nem_now().date()
     fmap = refresh_fuel_map(con, fetch=fetch)
     results = {}
     for source in ("dispatch", "rooftop_pv", "scada", "predispatch"):

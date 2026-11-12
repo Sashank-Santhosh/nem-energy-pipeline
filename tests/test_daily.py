@@ -76,3 +76,11 @@ def test_score_excludes_incomplete_days(db):
     assert all(n == 48 for _, _, n in days)
     assert ("SA1", pd.Timestamp("2026-11-09").date(), 48) in days
     assert not any(r == "SA1" and str(d) == "2026-11-10" for r, d, _ in days)
+
+
+def test_daily_if_due_runs_once_after_issue_time(db):
+    with duckdb.connect(str(db)) as con:
+        assert daily.run_if_due(con, pd.Timestamp("2026-11-09 12:59")) == 0  # too early
+        assert daily.run_if_due(con, pd.Timestamp("2026-11-09 13:07")) == 240
+        assert daily.run_if_due(con, pd.Timestamp("2026-11-09 14:07")) == 0  # already done today
+        assert con.execute("select count(*) from forecasts.daily").fetchone()[0] == 240

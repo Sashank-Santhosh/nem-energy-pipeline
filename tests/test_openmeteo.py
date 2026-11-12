@@ -40,3 +40,12 @@ def test_load_weather_appends(con):
     openmeteo.load_weather(con, df)
     openmeteo.load_weather(con, df)
     assert con.execute("select count(*) from raw.weather").fetchone()[0] == 144
+
+
+def test_fetched_at_is_nem_time():
+    import pandas as pd
+
+    clock = lambda: pd.Timestamp("2026-11-09 13:00")
+    df = openmeteo.fetch_temperatures("SA1", date(2026, 10, 3), date(2026, 10, 5), "archive",
+                                      fetch=Capture(ARCHIVE), now=clock)
+    assert set(df["fetched_at"]) == {pd.Timestamp("2026-11-09 13:00")}
