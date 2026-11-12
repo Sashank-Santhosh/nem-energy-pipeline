@@ -15,3 +15,7 @@ jobs:
       - run: uv sync
       - run: uv run ruff check .
       - run: uv run pytest -q
+      - run: uv run python scripts/build_sample_db.py data/ci.duckdb
+      - run: uv run dbt build --project-dir dbt --profiles-dir dbt
+        env:
+          NEM_DB: data/ci.duckdb

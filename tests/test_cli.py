@@ -42,3 +42,9 @@ def test_predispatch_url_filter_keeps_only_noon_runs():
     assert keep("x/PUBLIC_PREDISPATCHIS_202611121200_20261112113100.zip")
     assert keep("x/PUBLIC_PREDISPATCHIS_202611121230_20261112120100.zip")
     assert not keep("x/PUBLIC_PREDISPATCHIS_202611121630_20261112160155.zip")
+
+
+def test_sample_db_creates_missing_folder(tmp_path):
+    out = tmp_path / "new" / "dir" / "s.duckdb"
+    build_sample(out)
+    assert out.exists()

@@ -1,0 +1,18 @@
+version: 2
+models:
+  - name: fct_region_interval
+    columns:
+      - name: interval_key
+        data_tests: [unique, not_null]
+      - name: interval_end
+        data_tests: [not_null]
+      - name: regionid
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["NSW1", "QLD1", "VIC1", "SA1", "TAS1"]
+  - name: fct_demand_half_hourly
+    columns:
+      - name: demand_mw
+        data_tests: [not_null]

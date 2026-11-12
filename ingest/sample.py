@@ -97,6 +97,7 @@ def _load_fixtures(con) -> None:
 
 def build_sample(out: Path) -> Path:
     out = Path(out)
+    out.parent.mkdir(parents=True, exist_ok=True)
     out.unlink(missing_ok=True)
     con = duckdb.connect(str(out))
     state.ensure_schema(con)

@@ -1,0 +1,16 @@
+version: 2
+sources:
+  - name: raw
+    schema: raw
+    tables:
+      - name: dispatch_regionsum
+      - name: dispatch_price
+      - name: rooftop_pv_actual
+      - name: fuel_mix
+      - name: predispatch_regionsum
+      - name: weather
+  - name: forecasts
+    schema: forecasts
+    tables:
+      - name: daily
+      - name: backtest
