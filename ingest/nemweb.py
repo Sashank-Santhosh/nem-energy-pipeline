@@ -1,5 +1,6 @@
 """Discover and load new NEMWeb files into append-only raw tables."""
 
+import contextlib
 import re
 from dataclasses import dataclass
 from datetime import datetime
@@ -58,10 +59,8 @@ def load_new_files(con, source: str, folder_url: str, fetch=default_fetch,
             con.execute("commit")
             result.loaded += 1
         except Exception as e:  # noqa: BLE001 - a bad file must not stop the run
-            try:
+            with contextlib.suppress(Exception):  # failed before the transaction began
                 con.execute("rollback")
-            except Exception:  # noqa: BLE001 - failed before the transaction began
-                pass
             state.record_error(con, source, url, f"{type(e).__name__}: {e}")
             result.failed += 1
     return result
