@@ -84,7 +84,7 @@ def test_half_hourly_only_complete_periods(db):
 def test_aemo_forecast_issue_times(db):
     df = q(db, "select distinct strftime(issue_time, '%H:%M') t from marts.fct_aemo_forecast "
                "where regionid = 'NSW1' and target_time < '2026-11-11'")
-    assert set(df.t) == {"11:30", "12:00"}
+    assert set(df.t) == {"12:30", "13:00"}
 
 
 def test_rooftop_prefers_measurement(db):

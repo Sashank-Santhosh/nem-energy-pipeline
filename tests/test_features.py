@@ -16,7 +16,7 @@ def series(start="2026-10-01", end="2026-11-07", freq="30min", fn=lambda t: 1000
 
 
 def test_issue_time_and_targets():
-    assert features.issue_time_for(D) == pd.Timestamp("2026-11-04 12:00")
+    assert features.issue_time_for(D) == pd.Timestamp("2026-11-04 13:00")
     tt = features.target_times(D)
     assert len(tt) == 48
     assert tt[0] == pd.Timestamp("2026-11-05 00:30") and tt[-1] == pd.Timestamp("2026-11-06 00:00")
@@ -75,7 +75,7 @@ def test_naive_is_seven_days_earlier():
 def test_aemo_benchmark_picks_latest_run_before_issue():
     tt = features.target_times(D)
     runs = []
-    for issue, mw in (("2026-11-04 11:30", 1.0), ("2026-11-04 12:00", 2.0), ("2026-11-04 12:30", 3.0)):
+    for issue, mw in (("2026-11-04 12:30", 1.0), ("2026-11-04 13:00", 2.0), ("2026-11-04 13:30", 3.0)):
         runs += [{"issue_time": pd.Timestamp(issue), "target_time": t, "aemo_mw": mw} for t in tt]
     out = benchmarks.aemo_benchmark(pd.DataFrame(runs), tt, features.issue_time_for(D))
     assert set(out) == {2.0}

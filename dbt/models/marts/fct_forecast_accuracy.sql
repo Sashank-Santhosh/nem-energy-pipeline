@@ -1,5 +1,6 @@
 {{ config(enabled=var('forecasts_ready')) }}
 -- Scores every forecast once actuals exist; days with fewer than 48 actual half-hours are skipped.
+-- Only half-hours where all three forecasts exist are kept, so they are compared like for like.
 with forecasts as (
     select regionid, issue_time, target_time, model_mw, naive_mw, 'live' as period
     from {{ source('forecasts', 'daily') }}
@@ -14,7 +15,7 @@ complete_days as (
     having count(*) = 48
 ),
 aemo as (
-    select f.regionid, f.issue_time, f.target_time, a.aemo_mw
+    select f.regionid, f.issue_time, f.target_time, f.period, a.aemo_mw
     from forecasts f
     join {{ ref('fct_aemo_forecast') }} a
       on a.regionid = f.regionid and a.target_time = f.target_time and a.issue_time <= f.issue_time
@@ -31,5 +32,7 @@ join {{ ref('fct_demand_half_hourly') }} h
   on h.regionid = f.regionid and h.period_end = f.target_time
 join complete_days c
   on c.regionid = f.regionid and c.d = cast(f.target_time - interval 30 minute as date)
-left join aemo a
+join aemo a
   on a.regionid = f.regionid and a.issue_time = f.issue_time and a.target_time = f.target_time
+ and a.period = f.period
+where f.model_mw is not null and f.naive_mw is not null

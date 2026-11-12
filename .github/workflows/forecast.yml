@@ -1,7 +1,7 @@
 name: forecast
 on:
   schedule:
-    - cron: "5 2 * * *"   # 02:05 UTC = 12:05 NEM time (AEST, no daylight saving)
+    - cron: "5 3 * * *"   # 03:05 UTC = 13:05 NEM time (AEST, no daylight saving)
   workflow_dispatch:
 concurrency:
   group: nem-db          # shared with collect.yml

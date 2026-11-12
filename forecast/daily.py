@@ -1,4 +1,4 @@
-"""Daily job: at 12:00 NEM time, forecast tomorrow's 48 half-hours for every region."""
+"""Daily job: at 13:00 NEM time, forecast tomorrow's 48 half-hours for every region."""
 
 import logging
 from datetime import timedelta

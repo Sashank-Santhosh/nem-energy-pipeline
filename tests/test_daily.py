@@ -7,7 +7,7 @@ from forecast import daily, store
 from ingest.sample import build_sample
 from tests.test_dbt_models import run_dbt
 
-NOW = pd.Timestamp("2026-11-09 12:05")  # forecasts 2026-11-10
+NOW = pd.Timestamp("2026-11-09 13:05")  # forecasts 2026-11-10
 
 
 @pytest.fixture
@@ -24,7 +24,7 @@ def test_daily_writes_48_rows_per_region(db):
         n = con.execute("select regionid, count(*) from forecasts.daily group by 1").fetchall()
     assert len(out) == 240
     assert sorted(n) == [(r, 48) for r in ("NSW1", "QLD1", "SA1", "TAS1", "VIC1")]
-    assert out["issue_time"].unique().tolist() == [pd.Timestamp("2026-11-09 12:00")]
+    assert out["issue_time"].unique().tolist() == [pd.Timestamp("2026-11-09 13:00")]
 
 
 def test_daily_is_idempotent(db):
@@ -49,7 +49,7 @@ def test_daily_uses_only_forecasts_fetched_before_issue(db):
     with duckdb.connect(str(db)) as con:
         # A "too new" forecast for every hour of the target day must be ignored.
         con.execute("insert into raw.weather select time, region, 99.0, kind, "
-                    "timestamp '2026-11-09 13:00' from raw.weather where kind = 'forecast' "
+                    "timestamp '2026-11-09 14:00' from raw.weather where kind = 'forecast' "
                     "and cast(time as date) = date '2026-11-10'")
     run_dbt(db)
     with duckdb.connect(str(db)) as con:
@@ -57,13 +57,13 @@ def test_daily_uses_only_forecasts_fetched_before_issue(db):
     assert a["model_mw"].between(0, 20000).all()
     with duckdb.connect(str(db)) as con:
         temps = con.execute("select max(temperature_c) from staging.stg_weather where kind = "
-                            "'forecast' and fetched_at <= timestamp '2026-11-09 12:00'").fetchone()
+                            "'forecast' and fetched_at <= timestamp '2026-11-09 13:00'").fetchone()
     assert temps[0] < 99
 
 
 def test_score_excludes_incomplete_days(db):
     with duckdb.connect(str(db)) as con:
-        daily.run_daily(con, pd.Timestamp("2026-11-08 12:05"))  # target 11-09: complete
+        daily.run_daily(con, pd.Timestamp("2026-11-08 13:05"))  # target 11-09: complete
         daily.run_daily(con, NOW)                                # target 11-10: made incomplete
         con.execute("delete from raw.dispatch_regionsum where regionid = 'SA1' and "
                     "settlementdate = '2026/11/10 15:05:00'")

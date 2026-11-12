@@ -39,7 +39,7 @@ def _range(freq: str, extra_days: int = 0) -> pd.Series:
 def _predispatch_rows(region: str) -> pd.DataFrame:
     rows = []
     for day in pd.date_range(END - pd.Timedelta(days=DAYS), END, freq="D", inclusive="left"):
-        for period in ("16", "17"):
+        for period in ("18", "19"):
             issue = day + pd.Timedelta(hours=4) + pd.Timedelta(minutes=30 * (int(period) - 1))
             targets = pd.Series(pd.date_range(issue + pd.Timedelta(minutes=30), periods=72,
                                               freq="30min"))

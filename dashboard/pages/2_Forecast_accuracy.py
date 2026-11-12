@@ -10,7 +10,7 @@ import streamlit as st
 from dashboard import data, ui
 
 st.title("How good is my forecast?")
-st.markdown("Every day at 12:00 NEM time the model forecasts demand for each half-hour of the "
+st.markdown("Every day at 13:00 NEM time the model forecasts demand for each half-hour of the "
             "next day. It is scored against what actually happened, alongside AEMO's own "
             "pre-dispatch forecast and a naive 'same time last week' baseline.")
 con = ui.connection()

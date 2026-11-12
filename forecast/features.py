@@ -1,4 +1,7 @@
-"""Leak-safe features for a day-ahead, half-hourly demand forecast issued at 12:00 NEM time."""
+"""Leak-safe features for a day-ahead, half-hourly demand forecast issued at 13:00 NEM time.
+
+13:00 because AEMO's first pre-dispatch run covering all of tomorrow is issued at 12:30.
+"""
 
 from datetime import date, timedelta
 
@@ -9,6 +12,7 @@ import pandas as pd
 from ingest.sources import HOLIDAY_SUBDIV
 
 HALF_HOUR = pd.Timedelta(minutes=30)
+ISSUE_HOUR = 13
 FEATURES = ["half_hour", "dow", "month", "is_holiday", "temp_c", "temp_c_sq",
             "lag_2d_mw", "lag_7d_mw"]
 
@@ -18,7 +22,7 @@ class LeakageError(ValueError):
 
 
 def issue_time_for(target_date: date) -> pd.Timestamp:
-    return pd.Timestamp(target_date - timedelta(days=1)) + pd.Timedelta(hours=12)
+    return pd.Timestamp(target_date - timedelta(days=1)) + pd.Timedelta(hours=ISSUE_HOUR)
 
 
 def target_times(target_date: date) -> pd.DatetimeIndex:

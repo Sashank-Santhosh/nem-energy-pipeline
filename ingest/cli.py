@@ -15,10 +15,11 @@ from ingest.fuel_map import load_fuel_map
 from ingest.http import fetch as default_fetch
 from ingest.sources import ARCHIVE_FOLDERS, FOLDERS, NEMWEB_BASE, REGIONS, REGISTRATION_LIST_URL
 
-# Pre-dispatch runs issued ~11:30 and ~12:00 NEM time: their first period ends 12:00 / 12:30,
-# i.e. trading-day periods 16 and 17 (the trading day starts at 04:00).
-NOON_FILE = re.compile(r"PUBLIC_PREDISPATCHIS_\d{8}(1200|1230)_")
-NOON_PERIODS = ("16", "17")
+# Pre-dispatch runs issued ~12:30 and ~13:00 NEM time: the first runs that cover all of tomorrow
+# (earlier runs stop at 04:00). Their first period ends 13:00 / 13:30, i.e. trading-day periods
+# 18 and 19 (the trading day starts at 04:00).
+NOON_FILE = re.compile(r"PUBLIC_PREDISPATCHIS_\d{8}(1300|1330)_")
+NOON_PERIODS = ("18", "19")
 ARCHIVE_DATE = re.compile(r"_(\d{8})(?:_\d{8})?\.zip$", re.IGNORECASE)
 
 

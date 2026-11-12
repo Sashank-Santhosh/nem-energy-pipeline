@@ -39,8 +39,9 @@ def test_counts_command_prints_json(tmp_path, capsys):
 
 def test_predispatch_url_filter_keeps_only_noon_runs():
     keep = cli.predispatch_url_filter
-    assert keep("x/PUBLIC_PREDISPATCHIS_202611121200_20261112113100.zip")
-    assert keep("x/PUBLIC_PREDISPATCHIS_202611121230_20261112120100.zip")
+    assert keep("x/PUBLIC_PREDISPATCHIS_202611121300_20261112123206.zip")
+    assert keep("x/PUBLIC_PREDISPATCHIS_202611121330_20261112130206.zip")
+    assert not keep("x/PUBLIC_PREDISPATCHIS_202611121200_20261112113115.zip")
     assert not keep("x/PUBLIC_PREDISPATCHIS_202611121630_20261112160155.zip")
 
 

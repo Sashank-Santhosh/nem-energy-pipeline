@@ -35,8 +35,13 @@ def db(tmp_path_factory):
     build_sample(path)
     run_dbt(path)
     with duckdb.connect(str(path)) as con:
+        # No AEMO run covering TAS1's 2026-11-10: those half-hours must not be scored at all.
+        con.execute("delete from raw.predispatch_regionsum where regionid = 'TAS1' "
+                    "and predispatchseqno like '20261109%'")
+    run_dbt(path)
+    with duckdb.connect(str(path)) as con:
         for day in ("2026-11-07", "2026-11-08", "2026-11-09"):
-            daily.run_daily(con, pd.Timestamp(day) + pd.Timedelta(hours=12, minutes=5))
+            daily.run_daily(con, pd.Timestamp(day) + pd.Timedelta(hours=13, minutes=5))
         store.ensure_tables(con)
         con.execute("insert into forecasts.backtest select regionid, issue_time, target_time, "
                     "null, model_mw, naive_mw, null from forecasts.daily")
@@ -122,3 +127,11 @@ def test_missing_values_show_as_not_available():
     assert fmt(float("nan"), "{:.0%}") == "n/a"
     assert fmt(0.0, "{:,.0f} MW") == "0 MW"
     assert fmt(1234.4, "{:,.0f} MW") == "1,234 MW"
+
+
+def test_accuracy_scores_all_sources_on_the_same_rows(con):
+    rows = con.execute("""select regionid, period, count(*) n,
+            count(*) filter (where model_mw is not null and naive_mw is not null
+                             and aemo_mw is not null and actual_mw is not null) complete
+        from marts.fct_forecast_accuracy group by 1, 2""").fetchall()
+    assert rows and all(n == complete for _, _, n, complete in rows)
