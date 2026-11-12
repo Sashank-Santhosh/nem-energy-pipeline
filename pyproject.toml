@@ -1,0 +1,31 @@
+[project]
+name = "nem-energy-pipeline"
+version = "0.1.0"
+description = "Live AEMO NEM data pipeline, demand forecast and dashboard"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "duckdb>=1.1",
+    "pandas>=2.2",
+    "pyarrow>=17",
+    "requests>=2.32",
+    "openpyxl>=3.1",
+    "lightgbm>=4.5",
+    "holidays>=0.60",
+    "streamlit>=1.40",
+    "plotly>=5.24",
+    "dbt-duckdb>=1.9",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.3", "ruff>=0.8", "pyspark>=3.5"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+extend-exclude = ["dbt"]
