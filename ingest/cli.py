@@ -42,17 +42,23 @@ def safe_to_upload(old: dict[str, int], new: dict[str, int]) -> bool:
 
 
 def refresh_fuel_map(con, fetch=default_fetch, max_age_days: int = 7) -> pd.DataFrame:
+    """Unit -> fuel lookup. Reference data (replaced, not appended), so it lives in `ref`,
+    outside the raw tables the upload guard counts. A failed refresh keeps the old map."""
     state.ensure_schema(con)
-    con.execute("create table if not exists raw.fuel_map"
+    con.execute("create schema if not exists ref")
+    con.execute("create table if not exists ref.fuel_map"
                 "(duid varchar, regionid varchar, fuel varchar, loaded_at timestamp)")
-    age = con.execute("select date_diff('day', max(loaded_at), now()) from raw.fuel_map").fetchone()[0]
+    age = con.execute("select date_diff('day', max(loaded_at), now()) from ref.fuel_map").fetchone()[0]
     if age is None or age >= max_age_days:
-        fm = load_fuel_map(fetch(REGISTRATION_LIST_URL))
-        con.execute("delete from raw.fuel_map")  # reference data, not history: replace
-        con.register("_fm", fm)
-        con.execute("insert into raw.fuel_map select duid, regionid, fuel, now() from _fm")
-        con.unregister("_fm")
-    return con.execute("select duid, regionid, fuel from raw.fuel_map").df()
+        try:
+            fm = load_fuel_map(fetch(REGISTRATION_LIST_URL))
+            con.execute("delete from ref.fuel_map")
+            con.register("_fm", fm)
+            con.execute("insert into ref.fuel_map select duid, regionid, fuel, now() from _fm")
+            con.unregister("_fm")
+        except Exception as e:  # noqa: BLE001 - keep collecting with the previous map
+            state.record_error(con, "fuel_map", REGISTRATION_LIST_URL, f"{type(e).__name__}: {e}")
+    return con.execute("select duid, regionid, fuel from ref.fuel_map").df()
 
 
 def collect(con, fetch=default_fetch, max_files: int | None = None, today: date | None = None) -> dict:

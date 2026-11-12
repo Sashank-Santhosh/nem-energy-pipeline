@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --no-dev
-      - run: scripts/release_db.sh download nem.duckdb
+      - run: bash scripts/release_db.sh download nem.duckdb
       - run: uv run python -m ingest.cli counts --db nem.duckdb > old.json
       - run: uv run python -m forecast.cli daily --db nem.duckdb
       - run: >-
@@ -27,4 +27,4 @@ jobs:
           --vars '{"forecasts_ready": true}'
       - run: uv run python -m ingest.cli counts --db nem.duckdb > new.json
       - run: uv run python -m ingest.cli guard --old old.json --new new.json
-      - run: scripts/release_db.sh upload nem.duckdb
+      - run: bash scripts/release_db.sh upload nem.duckdb

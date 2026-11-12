@@ -35,7 +35,7 @@ jobs:
           echo "SINCE=$(date -d "-${{ inputs.history_months }} months" +%F)" >> "$GITHUB_ENV"
           echo "BT_SINCE=$(date -d "-${{ inputs.backtest_months }} months -14 days" +%F)" >> "$GITHUB_ENV"
           echo "YESTERDAY=$(date -d yesterday +%F)" >> "$GITHUB_ENV"
-      - run: scripts/release_db.sh download nem.duckdb
+      - run: bash scripts/release_db.sh download nem.duckdb
       - run: uv run python -m ingest.cli counts --db nem.duckdb > old.json
       - run: uv run python -m ingest.cli backfill-nemweb --db nem.duckdb --source dispatch --since "$SINCE"
       - run: uv run python -m ingest.cli backfill-nemweb --db nem.duckdb --source rooftop_pv --since "$SINCE"
@@ -57,5 +57,5 @@ jobs:
           --vars '{"forecasts_ready": true}'
       - run: uv run python -m ingest.cli counts --db nem.duckdb > new.json
       - run: uv run python -m ingest.cli guard --old old.json --new new.json
-      - run: scripts/release_db.sh upload nem.duckdb
+      - run: bash scripts/release_db.sh upload nem.duckdb
       - run: ls -l nem.duckdb && cat backtest.txt

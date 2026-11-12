@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import duckdb
 
@@ -86,3 +87,25 @@ def test_weather_history_loads_every_region(tmp_path):
     assert n == 5 * 72
     kinds = con.execute("select distinct kind from raw.weather").fetchall()
     assert kinds == [("historical_forecast",)]
+
+
+def test_fuel_map_is_reference_data_not_counted_by_guard(tmp_path):
+    con = duckdb.connect(str(tmp_path / "f.duckdb"))
+    xlsx = (Path(__file__).parent / "fixtures" / "registration_sample.xlsx").read_bytes()
+    cli.refresh_fuel_map(con, fetch=lambda u, **_: xlsx)
+    assert "raw.fuel_map" not in cli.counts(con)
+    assert con.execute("select count(*) from ref.fuel_map").fetchone()[0] > 0
+
+
+def test_collect_survives_fuel_map_download_failure(tmp_path):
+    con = duckdb.connect(str(tmp_path / "g.duckdb"))
+    xlsx = (Path(__file__).parent / "fixtures" / "registration_sample.xlsx").read_bytes()
+    cli.refresh_fuel_map(con, fetch=lambda u, **_: xlsx)
+    con.execute("update ref.fuel_map set loaded_at = loaded_at - interval 30 day")
+
+    def broken(url, **_):
+        raise RuntimeError("registration list moved")
+
+    fmap = cli.refresh_fuel_map(con, fetch=broken)
+    assert len(fmap) > 0  # keeps using the previous map
+    assert con.execute("select count(*) from raw.load_errors").fetchone()[0] == 1
