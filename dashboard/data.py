@@ -3,6 +3,7 @@
 import os
 import tempfile
 from datetime import date
+from pathlib import Path
 
 import duckdb
 import pandas as pd
@@ -12,17 +13,42 @@ FUELS = ["solar", "wind", "coal", "gas", "hydro", "battery", "other"]
 ACCURACY_COLS = ["regionid", "source", "period", "mae_mw", "mape_pct"]
 
 
+DOWNLOAD_DIR = Path(tempfile.gettempdir())
+_current: dict = {}  # the downloaded copy in use: {"path": Path, "con": connection}
+
+
+def _download(url: str) -> Path:
+    """Download to a fresh file, then switch to it; the previous copy is closed and deleted,
+    so hourly refreshes never pile up copies on disk."""
+    new = DOWNLOAD_DIR / f"nem-dashboard-{os.getpid()}-{os.urandom(4).hex()}.duckdb"
+    # The release keeps the previous upload as nem-prev.duckdb; use it if the current copy is
+    # mid-swap or missing.
+    for candidate in (url, url.replace("/nem.duckdb", "/nem-prev.duckdb")):
+        try:
+            with new.open("wb") as f, requests.get(candidate, stream=True, timeout=120) as r:
+                r.raise_for_status()
+                for chunk in r.iter_content(1 << 20):
+                    f.write(chunk)
+            return new
+        except requests.RequestException:
+            if candidate != url:
+                raise
+    return new
+
+
 def get_connection(path: str | None = None) -> duckdb.DuckDBPyConnection:
     """Open the database read-only: an explicit path, NEM_DB_PATH, or a download of NEM_DB_URL."""
     path = path or os.environ.get("NEM_DB_PATH")
-    if not path:
-        url = os.environ["NEM_DB_URL"]
-        fd, path = tempfile.mkstemp(suffix=".duckdb")
-        with os.fdopen(fd, "wb") as f, requests.get(url, stream=True, timeout=120) as r:
-            r.raise_for_status()
-            for chunk in r.iter_content(1 << 20):
-                f.write(chunk)
-    return duckdb.connect(path, read_only=True)
+    if path:
+        return duckdb.connect(path, read_only=True)
+    new = _download(os.environ["NEM_DB_URL"])
+    con = duckdb.connect(str(new), read_only=True)
+    old = _current.copy()
+    _current.update(path=new, con=con)
+    if old:
+        old["con"].close()
+        Path(old["path"]).unlink(missing_ok=True)
+    return con
 
 
 def _has(con, table: str) -> bool:

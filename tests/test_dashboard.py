@@ -135,3 +135,62 @@ def test_accuracy_scores_all_sources_on_the_same_rows(con):
                              and aemo_mw is not null and actual_mw is not null) complete
         from marts.fct_forecast_accuracy group by 1, 2""").fetchall()
     assert rows and all(n == complete for _, _, n, complete in rows)
+
+
+def test_hourly_refresh_reuses_disk_and_closes_old_connection(db, tmp_path, monkeypatch):
+    payload = Path(db).read_bytes()
+
+    class Resp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def raise_for_status(self):
+            pass
+
+        def iter_content(self, n):
+            yield payload
+
+    monkeypatch.delenv("NEM_DB_PATH", raising=False)
+    monkeypatch.setenv("NEM_DB_URL", "https://example.invalid/nem.duckdb")
+    monkeypatch.setattr(data.requests, "get", lambda *a, **k: Resp())
+    monkeypatch.setattr(data, "DOWNLOAD_DIR", tmp_path)
+    first = data.get_connection()
+    second = data.get_connection()
+    with pytest.raises(duckdb.Error):
+        first.execute("select 1")  # closed
+    assert second.execute("select count(*) from marts.fct_region_interval").fetchone()[0] > 0
+    assert len(list(tmp_path.glob("*.duckdb"))) == 1
+    second.close()
+
+
+def test_download_falls_back_to_previous_copy(tmp_path, monkeypatch):
+    asked = []
+
+    class Resp:
+        def __init__(self, url):
+            self.url = url
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def raise_for_status(self):
+            if self.url.endswith("/nem.duckdb"):
+                raise data.requests.HTTPError("404 during an upload swap")
+
+        def iter_content(self, n):
+            yield b"x"
+
+    def get(url, **_):
+        asked.append(url)
+        return Resp(url)
+
+    monkeypatch.setattr(data.requests, "get", get)
+    monkeypatch.setattr(data, "DOWNLOAD_DIR", tmp_path)
+    data._download("https://h/releases/download/data-latest/nem.duckdb")
+    assert asked[-1] == "https://h/releases/download/data-latest/nem-prev.duckdb"
