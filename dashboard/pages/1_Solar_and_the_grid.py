@@ -14,16 +14,17 @@ region = ui.region_picker()
 
 cards = data.headline_cards(con, region)
 c1, c2, c3 = st.columns(3)
-year_ago = cards["min_demand_year_ago"]
-c1.metric("Lowest demand yesterday", f"{cards['min_demand_today'] or 0:,.0f} MW",
-          None if year_ago is None else f"{(cards['min_demand_today'] or 0) - year_ago:,.0f} MW vs a year ago",
-          delta_color="off")
-c2.metric("Negative-price intervals this month", f"{cards['negative_intervals_month'] or 0:,.0f}")
-c3.metric("Solar share at midday (last 7 days)", f"{(cards['midday_solar_share'] or 0):.0%}")
+today, year_ago = cards["min_demand_today"], cards["min_demand_year_ago"]
+delta = None if today is None or year_ago is None else f"{today - year_ago:,.0f} MW vs a year ago"
+c1.metric("Lowest demand yesterday", ui.fmt(today, "{:,.0f} MW"), delta, delta_color="off")
+c2.metric("Negative-price intervals this month",
+          ui.fmt(cards["negative_intervals_month"], "{:,.0f}"))
+c3.metric("Solar share at midday (last 7 days)", ui.fmt(cards["midday_solar_share"], "{:.0%}"))
 
 latest = data.latest_interval(con)
-curve = data.duck_curve(con, region, latest.date().replace(day=1))
-fig = px.line(curve, x="time_of_day", y=["this_year_mw", "last_year_mw"],
+curve = data.duck_curve(con, region, latest.date().replace(day=1)).rename(
+    columns={"this_year_mw": "This year", "last_year_mw": "Same month last year"})
+fig = px.line(curve, x="time_of_day", y=["This year", "Same month last year"],
               labels={"value": "Average demand (MW)", "time_of_day": "Time of day", "variable": ""})
 st.plotly_chart(fig, use_container_width=True)
 st.caption("The 'duck curve': demand from the grid sags at midday as rooftop panels supply homes "

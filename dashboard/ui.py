@@ -10,6 +10,13 @@ REGION_NAMES = {"NSW1": "New South Wales", "QLD1": "Queensland", "VIC1": "Victor
                 "SA1": "South Australia", "TAS1": "Tasmania"}
 
 
+def fmt(value, pattern: str) -> str:
+    """Format a number, or "n/a" when it is missing (never show a fake zero)."""
+    if value is None or pd.isna(value):
+        return "n/a"
+    return pattern.format(value)
+
+
 @st.cache_resource(ttl=3600)
 def connection():
     return data.get_connection()

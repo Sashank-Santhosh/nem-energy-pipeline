@@ -113,3 +113,12 @@ def test_pages_render_without_error(db, page, monkeypatch):
     assert not at.exception, at.exception
     text = " ".join(m.value for m in at.markdown) + " ".join(c.value for c in at.caption)
     assert copy.ATTRIBUTION in text and copy.DISCLAIMER in text
+
+
+def test_missing_values_show_as_not_available():
+    from dashboard.ui import fmt
+
+    assert fmt(None, "{:,.0f} MW") == "n/a"
+    assert fmt(float("nan"), "{:.0%}") == "n/a"
+    assert fmt(0.0, "{:,.0f} MW") == "0 MW"
+    assert fmt(1234.4, "{:,.0f} MW") == "1,234 MW"

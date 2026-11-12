@@ -17,14 +17,16 @@ con = ui.connection()
 region = ui.region_picker("NSW1")
 
 latest = data.latest_interval(con)
-for label, day in (("Tomorrow", latest.date()), ("Most recent completed day",
-                                                 (latest - pd.Timedelta(days=1)).date())):
+for label, day in (("Tomorrow", (latest + pd.Timedelta(days=1)).date()),
+                   ("Yesterday", (latest - pd.Timedelta(days=1)).date())):
     df = data.forecast_vs_aemo(con, region, day)
     st.subheader(f"{label}: {day:%a %d %b}")
     if df.empty:
         st.info("No forecast for this day yet.")
         continue
-    st.plotly_chart(px.line(df, x="target_time", y=["model_mw", "aemo_mw", "actual_mw"],
+    df = df.rename(columns={"model_mw": "My forecast", "aemo_mw": "AEMO forecast",
+                            "actual_mw": "Actual"})
+    st.plotly_chart(px.line(df, x="target_time", y=["My forecast", "AEMO forecast", "Actual"],
                             labels={"value": "Demand (MW)", "target_time": "", "variable": ""}),
                     use_container_width=True)
 
