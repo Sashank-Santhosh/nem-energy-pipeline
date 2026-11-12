@@ -20,7 +20,7 @@ A flagship portfolio project that proves one person can do all three jobs on a r
 3. README with an architecture diagram, a "decisions and trade-offs" section, and how to run it locally.
 4. Automated tests pass in CI (unit tests + dbt tests).
 5. A 2-minute demo video linked from the README.
-6. Runs at $0/month.
+6. Costs nothing, ever: no paid plan, no payment method on any account, no service that can bill overage (see §9 "Zero-payment rule").
 
 ## 2. Scope
 
@@ -33,14 +33,18 @@ A flagship portfolio project that proves one person can do all three jobs on a r
 ## 3. Architecture
 
 ```
-AEMO NEMWeb ──┐                                       ┌──> Streamlit dashboard (read-only)
-Open-Meteo  ──┼─> collect (GitHub Actions, hourly) ─> raw.* ─> dbt ─> marts.* ─┤
-              │                                     (MotherDuck)          └──> forecast job (daily)
-13-month ─────┴─> Spark backfill (one-off, laptop) ─> Parquet ─> raw.*            writes forecasts.*
-archive
+AEMO NEMWeb ──┐   collect (GitHub Actions, hourly):
+Open-Meteo  ──┼─>  1. download latest nem.duckdb from GitHub Release "data-latest"
+              │    2. append new files to raw.*  3. dbt build → marts.*
+              │    4. upload nem.duckdb back to the release ──────┐
+13-month ─────┘   (backfill: Spark on laptop → Parquet → raw.*)   │
+archive                                                           ├──> Streamlit dashboard (downloads the file, read-only)
+                  forecast (GitHub Actions, daily) ── same file ──┘    writes forecasts.* then re-uploads
 ```
 
-**Decision: hourly refresh, not every 30 minutes.** Each run picks up the twelve 5-minute files since the last run. This halves database compute (see §9 budget) and data is still "near-live" (≤ ~1 hour old). GitHub's scheduler can also start a few minutes late; hourly makes that irrelevant.
+**Decision: the database is a single DuckDB file stored as a GitHub Release asset.** No database service at all, so nothing can bill. The file stays small (§9), a release asset is replaced in place (no git-history growth), and everything lives in one free GitHub account. Workflows share a `concurrency` group so two runs never edit the file at the same time.
+
+**Decision: hourly refresh, not every 30 minutes.** Each run picks up the twelve 5-minute files since the last run. Data stays "near-live" (≤ ~1 hour old), and GitHub's scheduler starting a few minutes late doesn't matter.
 
 **Principle: raw is append-only.** Raw tables store source files untouched, plus `source_file` and `loaded_at` columns. Every clean table can be rebuilt from raw, so a bug fix never needs a re-download.
 
@@ -55,7 +59,7 @@ archive
 | AEMO demand forecast | NEMWeb pre-dispatch reports (PREDISPATCHREGIONSUM) | 30 min × region | The benchmark for my forecast |
 | Temperature (actual + forecast) | Open-Meteo (free, non-commercial, CC BY 4.0) | hourly × city | Sydney, Brisbane, Melbourne, Adelaide, Hobart |
 
-**To verify in milestone 1 (spike), before building on them:** exact NEMWeb folder names and file columns (AEMO moved to HTTPS with case-sensitive paths in April 2026 and is moving superseded reports to a `legacy` folder); whether Open-Meteo's free tier includes the historical *forecast* archive (needed for a leak-free backtest, see §6); MotherDuck free-plan limits on the live pricing page.
+**To verify in milestone 1 (spike), before building on them:** exact NEMWeb folder names and file columns (AEMO moved to HTTPS with case-sensitive paths in April 2026 and is moving superseded reports to a `legacy` folder); whether Open-Meteo's free tier includes the historical *forecast* archive (needed for a leak-free backtest, see §6); that GitHub Actions, GitHub Releases and Streamlit Community Cloud can all be used with no payment method on file.
 
 ## 5. Components and repo layout
 
@@ -85,9 +89,9 @@ Each unit has one job and talks to others only through database tables:
 - `fct_region_daily` — daily min/peak demand, midday dip depth, negative-price intervals, solar share.
 - `fct_forecast_accuracy` — per region per target interval: actual, my forecast, AEMO forecast, naive baseline, errors.
 
-**Tools:** Python 3.12, `uv` for dependencies, DuckDB/MotherDuck, dbt-duckdb, PySpark (local mode), LightGBM, Streamlit + Plotly, pytest, GitHub Actions.
+**Tools (all free and open source, or free hosted with no card):** Python 3.12, `uv` for dependencies, DuckDB, dbt-duckdb, PySpark (local mode), LightGBM, Streamlit + Plotly, pytest, GitHub Actions + Releases, Streamlit Community Cloud.
 
-**Decision: dbt-duckdb + MotherDuck.** The same SQL runs on a local DuckDB file and in the cloud, so tests run locally for free and the cloud database can be swapped (see §9 fallback) without rewriting models.
+**Decision: dbt-duckdb on a DuckDB file.** The same SQL runs identically on my laptop, in CI and in the scheduled job, so tests are free and there is no cloud database to pay for or migrate.
 
 ## 6. Forecast design
 
@@ -129,11 +133,17 @@ Each unit has one job and talks to others only through database tables:
 
 ## 9. Operations and budget
 
-- **Cost:** $0. GitHub Actions on a public repo, Streamlit Community Cloud, MotherDuck free plan (10 GB storage, 10 compute-hours/month per its Feb 2026 terms, to be re-checked).
+- **Zero-payment rule (hard requirement):**
+  - Only services usable with **no payment method on file**: GitHub (public repo: Actions on GitHub-hosted runners, Releases), Streamlit Community Cloud, AEMO NEMWeb, Open-Meteo free non-commercial API (no key).
+  - **Never add a credit/debit card or PayPal to any account used by this project.** With no payment method, a service cannot charge; at worst it stops working, which the fallbacks below cover.
+  - **No paid-capable services:** no MotherDuck, AWS, GCP, Azure, Databricks, Snowflake, paid APIs, custom domains, or paid video tools. The Claude API is not used; development uses the existing Claude subscription only.
+  - If any step ever asks for a card, stop and pick a free alternative; never "start a free trial".
+  - Demo video: free tools only (OBS Studio or Windows' built-in Clipchamp free tier), uploaded to YouTube as unlisted.
+- **Free-tier behaviour to expect:** Streamlit Community Cloud puts apps to sleep after a period without visitors; the first visitor clicks "wake up" and waits under a minute. The README says so.
 - **Storage estimate:** region-level data is ~0.5M rows/region/year. Unit-level SCADA is aggregated to fuel mix per region before upload (by Spark for the backfill; by the hourly collect job, in DuckDB, for new files — both using the same unit→fuel mapping in `ingest/fuel_map.py`), so raw unit data never goes to the cloud. Well under 1 GB.
-- **Compute budget:** hourly collect + incremental dbt (~720 runs/month) must stay under the free compute-hours. Measured in milestone 2.
-- **Fallback if MotherDuck limits are hit:** keep the database as a DuckDB file in free object storage (or committed Parquet snapshots) and have Streamlit read it directly. Because dbt-duckdb is used, models don't change.
-- **Secrets:** the MotherDuck token lives in GitHub Actions secrets and Streamlit secrets, never in code.
+- **File-size budget:** keep `nem.duckdb` under 500 MB (GitHub release assets allow up to 2 GB each). Measured in milestone 2; if it grows, older 5-minute data is rolled up to 30-minute.
+- **Fallback if GitHub Releases ever becomes unsuitable:** publish the same file as a free public Hugging Face dataset (no card needed). Models and dashboard don't change, only the download URL.
+- **Secrets:** none needed for data sources. Workflows use GitHub's built-in `GITHUB_TOKEN` to update the release; nothing is stored in code.
 
 ## 10. Testing
 
@@ -159,7 +169,8 @@ Each unit has one job and talks to others only through database tables:
 | Risk | Mitigation |
 |---|---|
 | NEMWeb file layout differs from documentation | M1 spike reads real files first; parsers tested on saved samples |
-| Free-tier limits change or are exceeded | dbt-duckdb portability fallback (§9) |
+| A free service changes its terms | No payment method anywhere, so it can only stop, not charge; Hugging Face fallback (§9) |
+| Two scheduled runs overwrite each other's file | Shared `concurrency` group; upload only after a successful `dbt build` |
 | Leak-free backtest not possible on free weather data | Label backtest as optimistic; rely on live scoring |
 | Recruiters see "built with AI" as shallow | README decisions section and demo explain every choice in my own words; I can rebuild any part from memory |
 | Time lost to holidays / Henkel prep | Hard cut order in §11 |
