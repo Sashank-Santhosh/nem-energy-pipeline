@@ -99,7 +99,7 @@ Each unit has one job and talks to others only through database tables:
 - **Issue time:** daily at 12:00 NEM time (AEST, UTC+10, no daylight saving — all timestamps in the project use NEM time), forecasting 00:00–24:00 tomorrow. AEMO's benchmark is the pre-dispatch forecast **issued closest to 12:00 on the same day**, so both forecasts have the same information horizon.
 - **Models:**
   1. Naive baseline: same half-hour one week earlier.
-  2. Main model: LightGBM, one model per region. Features: half-hour of day, day of week, public holiday (per state, `holidays` package), month, forecast temperature (and squared, for heating and cooling load), demand from the same half-hour 1 and 7 days earlier. No feature uses information after the issue time.
+  2. Main model: LightGBM, one model per region. Features: half-hour of day, day of week, public holiday (per state, `holidays` package), month, forecast temperature (and squared, for heating and cooling load), demand from the same half-hour 2 and 7 days earlier (not 1 day: for a target of tomorrow 18:00 that would be today 18:00, after the 12:00 issue time). No feature uses information after the issue time.
 - **Backtest:** rolling-origin over the last 6 months, refitting weekly; report MAE (MW) and MAPE (%) per region for all three forecasts.
 - **Leakage rule:** the backtest uses the temperature *forecast* that existed at issue time (Open-Meteo historical forecast archive). If that is not available for free, the backtest uses actual temperatures and the results are labelled "optimistic (actual weather)"; live scoring is then the honest number.
 - **Live scoring:** each day's forecast is scored once actuals arrive; the dashboard shows a rolling 30-day accuracy.
