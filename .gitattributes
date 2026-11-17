@@ -1,0 +1,5 @@
+# Store every text file with Unix line endings, whatever the editor or OS used.
+* text=auto eol=lf
+*.zip binary
+*.xlsx binary
+*.duckdb binary
