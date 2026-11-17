@@ -18,6 +18,8 @@ jobs:
       NEM_DB: nem.duckdb
     steps:
       - uses: actions/checkout@v4
+      - name: Keep the schedule alive (GitHub stops scheduled jobs after 60 days without commits)
+        run: bash scripts/keepalive.sh
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --no-dev
       - run: bash scripts/release_db.sh download nem.duckdb
