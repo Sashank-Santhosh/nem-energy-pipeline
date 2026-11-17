@@ -9,7 +9,7 @@ from ingest import state
 from ingest.fuel_map import aggregate_scada
 from ingest.http import fetch as default_fetch
 from ingest.mms import parse_mms
-from ingest.sources import NEMWEB_BASE, TABLES
+from ingest.sources import KEEP_COLUMNS, NEMWEB_BASE, TABLES
 
 HREF = re.compile(r'href="([^"]+\.zip)"', re.IGNORECASE)
 
@@ -52,6 +52,11 @@ def load_new_files(con, source: str, folder_url: str, fetch=default_fetch,
                     continue
                 if keep is not None:
                     df = keep(key, df)
+                if key in KEEP_COLUMNS:
+                    missing = [c for c in KEEP_COLUMNS[key] if c not in df.columns]
+                    if missing:
+                        raise ValueError(f"{key} is missing columns {missing}")
+                    df = df[list(KEEP_COLUMNS[key])]
                 if source == "scada":
                     if fuel_map is None:
                         raise ValueError("scada needs a fuel_map")

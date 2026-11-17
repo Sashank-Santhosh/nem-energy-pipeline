@@ -49,6 +49,19 @@ TABLES: dict[str, dict[str, str]] = {
     "scada": {"DISPATCH.UNIT_SCADA": "raw.fuel_mix"},
 }
 
+# Columns stored per MMS table. AEMO's tables are 68-129 columns wide (mostly price bands the
+# models never read); keeping all of them would roughly triple the database. A file lacking one
+# of these is rejected loudly. The full originals stay in AEMO's archive for a re-load.
+KEEP_COLUMNS: dict[str, tuple[str, ...]] = {
+    "DISPATCH.REGIONSUM": ("settlementdate", "runno", "regionid", "dispatchinterval",
+                           "intervention", "totaldemand"),
+    "DISPATCH.PRICE": ("settlementdate", "runno", "regionid", "dispatchinterval",
+                       "intervention", "rrp"),
+    "ROOFTOP.ACTUAL": ("interval_datetime", "regionid", "power", "qi", "type"),
+    "PREDISPATCH.REGION_SOLUTION": ("predispatchseqno", "runno", "regionid", "periodid",
+                                    "intervention", "totaldemand", "datetime"),
+}
+
 # Column positions in UNIT_SCADA "D" rows (0-based), for Spark's headerless read.
 SCADA_POS = {"settlementdate": 4, "duid": 5, "scadavalue": 6}
 

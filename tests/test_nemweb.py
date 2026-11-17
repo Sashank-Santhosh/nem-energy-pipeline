@@ -56,3 +56,26 @@ def test_keep_filters_rows_before_insert(con):
         keep=lambda key, df: df[df["regionid"] == "SA1"],
     )
     assert count(con, "raw.dispatch_regionsum") == 1
+
+
+def test_only_used_columns_are_stored(con):
+    nemweb.load_new_files(con, "dispatch", FOLDER, fetch=make_fetch(), max_files=1)
+    cols = {r[0] for r in con.execute(
+        "select column_name from information_schema.columns "
+        "where table_schema = 'raw' and table_name = 'dispatch_regionsum'").fetchall()}
+    assert cols == {"settlementdate", "runno", "regionid", "dispatchinterval", "intervention",
+                    "totaldemand", "source_file", "loaded_at"}
+
+
+def test_file_missing_a_needed_column_is_an_error_not_silent_nulls(con):
+    import io
+    import zipfile
+
+    bad = io.BytesIO()
+    with zipfile.ZipFile(bad, "w") as z:  # price table without its RRP column
+        z.writestr("x.csv", 'I,DISPATCH,PRICE,5,SETTLEMENTDATE,RUNNO,REGIONID,INTERVENTION\n'
+                            'D,DISPATCH,PRICE,5,"2026/11/12 16:35:00",1,SA1,0\n')
+    r = nemweb.load_new_files(con, "dispatch", FOLDER, fetch=make_fetch({F1: bad.getvalue()}))
+    assert (r.failed, r.loaded) == (1, 1)
+    msg = con.execute("select message from raw.load_errors").fetchone()[0]
+    assert "rrp" in msg

@@ -39,7 +39,9 @@ jobs:
       - run: uv run python -m ingest.cli counts --db nem.duckdb > old.json
       - run: uv run python -m ingest.cli backfill-nemweb --db nem.duckdb --source dispatch --since "$SINCE"
       - run: uv run python -m ingest.cli backfill-nemweb --db nem.duckdb --source rooftop_pv --since "$SINCE"
+      - run: bash scripts/checkpoint.sh   # dispatch + rooftop saved
       - run: uv run python -m ingest.cli backfill-nemweb --db nem.duckdb --source predispatch --since "$BT_SINCE"
+      - run: bash scripts/checkpoint.sh   # AEMO forecasts saved
       - name: Fuel mix with Spark
         run: |
           uv run python scripts/download_archive.py scada data/archive/scada --since "$SINCE"
@@ -48,6 +50,7 @@ jobs:
           uv run python -m spark.backfill --scada-dir data/archive/scada --registration data/registration.xlsx --out data/fuel_mix.parquet
           uv run python -m ingest.cli load-parquet --db nem.duckdb --table raw.fuel_mix --path data/fuel_mix.parquet
           rm -rf data/archive
+      - run: bash scripts/checkpoint.sh   # fuel mix saved
       - run: uv run python -m ingest.cli weather-history --db nem.duckdb --start "$SINCE" --end "$YESTERDAY" --kind archive
       - run: uv run python -m ingest.cli weather-history --db nem.duckdb --start "$BT_SINCE" --end "$YESTERDAY" --kind historical_forecast
       - run: uv run dbt build --project-dir dbt --profiles-dir dbt

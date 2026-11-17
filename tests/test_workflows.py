@@ -32,3 +32,16 @@ def test_hourly_job_makes_the_daily_forecast():
     assert "forecast.cli daily-if-due" in runs
     forecast = yaml.safe_load((WORKFLOWS[0].parent / "forecast.yml").read_text())
     assert "schedule" not in forecast.get(True, forecast.get("on", {}))  # manual only now
+
+
+def test_backfill_saves_a_checkpoint_after_each_stage():
+    wf = yaml.safe_load((WORKFLOWS[0].parent / "backfill.yml").read_text())
+    runs = [str(s.get("run", "")) for s in wf["jobs"]["backfill"]["steps"]]
+    checkpoints = [i for i, r in enumerate(runs) if "bash scripts/checkpoint.sh" in r]
+    stages = {name: next(i for i, r in enumerate(runs) if name in r)
+              for name in ("--source dispatch", "--source predispatch", "spark.backfill",
+                           "forecast.cli backtest")}
+    assert len(checkpoints) >= 3
+    assert any(stages["--source dispatch"] < c < stages["--source predispatch"] for c in checkpoints)
+    assert any(stages["--source predispatch"] < c < stages["spark.backfill"] for c in checkpoints)
+    assert any(stages["spark.backfill"] < c < stages["forecast.cli backtest"] for c in checkpoints)

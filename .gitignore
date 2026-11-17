@@ -8,3 +8,6 @@ dbt/dbt_packages/
 __pycache__/
 .env
 .superpowers/
+
+# graphify code graph (generated)
+graphify-out/
