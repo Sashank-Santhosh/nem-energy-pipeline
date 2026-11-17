@@ -9,6 +9,15 @@ import duckdb
 import pandas as pd
 import requests
 
+RELEASE_URL = ("https://github.com/Sashank-Santhosh/nem-energy-pipeline/releases/download/"
+               "data-latest/nem.duckdb")
+
+
+def default_db_url() -> str:
+    """The public data release, unless NEM_DB_URL points somewhere else."""
+    return os.environ.get("NEM_DB_URL", RELEASE_URL)
+
+
 FUELS = ["solar", "wind", "coal", "gas", "hydro", "battery", "other"]
 ACCURACY_COLS = ["regionid", "source", "period", "mae_mw", "mape_pct"]
 
@@ -41,7 +50,7 @@ def get_connection(path: str | None = None) -> duckdb.DuckDBPyConnection:
     path = path or os.environ.get("NEM_DB_PATH")
     if path:
         return duckdb.connect(path, read_only=True)
-    new = _download(os.environ["NEM_DB_URL"])
+    new = _download(default_db_url())
     con = duckdb.connect(str(new), read_only=True)
     old = _current.copy()
     _current.update(path=new, con=con)

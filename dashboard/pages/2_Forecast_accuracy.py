@@ -28,14 +28,14 @@ for label, day in (("Tomorrow", (latest + pd.Timedelta(days=1)).date()),
                             "actual_mw": "Actual"})
     st.plotly_chart(px.line(df, x="target_time", y=["My forecast", "AEMO forecast", "Actual"],
                             labels={"value": "Demand (MW)", "target_time": "", "variable": ""}),
-                    use_container_width=True)
+                    width="stretch")
 
 st.subheader("Accuracy (lower is better)")
 acc = data.accuracy_table(con)
 if acc.empty:
     st.info("Accuracy appears once forecasts have been scored against a full day of actuals.")
 else:
-    st.dataframe(acc.round(2), hide_index=True, use_container_width=True)
+    st.dataframe(acc.round(2), hide_index=True, width="stretch")
 st.caption("MAE is the average error in MW; MAPE is the average error as a percentage. The backtest "
            "uses archived short-lead weather forecasts, so it is slightly optimistic; the live "
            "30-day score is the honest number.")
