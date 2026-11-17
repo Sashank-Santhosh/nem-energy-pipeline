@@ -41,5 +41,6 @@ def footer(con) -> None:
         st.warning(f"Data may be out of date: latest interval is {latest:%d %b %Y %H:%M} NEM time.")
     st.divider()
     st.caption(f"Latest data: {latest:%d %b %Y %H:%M} NEM time (AEST, UTC+10)")
+    st.caption(copy.REFRESH_NOTE)
     st.caption(copy.ATTRIBUTION)
     st.caption(copy.DISCLAIMER)

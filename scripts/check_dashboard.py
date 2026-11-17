@@ -36,7 +36,7 @@ def main(db_path: str) -> int:
         at = AppTest.from_file(str(ROOT / page), default_timeout=90).run()
         text = " ".join(m.value for m in at.markdown) + " ".join(c.value for c in at.caption)
         problems = [str(e.value)[:200] for e in at.exception]
-        for needed in (copy.ATTRIBUTION, copy.DISCLAIMER):
+        for needed in (copy.ATTRIBUTION, copy.DISCLAIMER, copy.REFRESH_NOTE):
             if needed not in text:
                 problems.append(f"missing required text: {needed[:40]}...")
         print(f"{'FAIL' if problems else 'ok  '} {page}", *problems, sep="\n  " if problems else "")

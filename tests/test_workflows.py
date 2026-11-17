@@ -45,3 +45,9 @@ def test_backfill_saves_a_checkpoint_after_each_stage():
     assert any(stages["--source dispatch"] < c < stages["--source predispatch"] for c in checkpoints)
     assert any(stages["--source predispatch"] < c < stages["spark.backfill"] for c in checkpoints)
     assert any(stages["spark.backfill"] < c < stages["forecast.cli backtest"] for c in checkpoints)
+
+
+def test_hourly_job_has_two_timers_because_github_skips_many_scheduled_runs():
+    wf = yaml.safe_load((WORKFLOWS[0].parent / "collect.yml").read_text())
+    triggers = wf.get(True) or wf.get("on")  # YAML reads the key `on` as True
+    assert len(triggers["schedule"]) >= 2

@@ -58,8 +58,9 @@ def con(db):
 
 def test_is_stale_boundaries():
     latest = pd.Timestamp("2026-11-12 09:00")
-    assert data.is_stale(latest, latest + pd.Timedelta(hours=2, minutes=59)) is False
-    assert data.is_stale(latest, latest + pd.Timedelta(hours=3, minutes=1)) is True
+    # GitHub's free scheduler really runs every 4-11 hours, so "stale" starts after 12 hours.
+    assert data.is_stale(latest, latest + pd.Timedelta(hours=11, minutes=59)) is False
+    assert data.is_stale(latest, latest + pd.Timedelta(hours=12, minutes=1)) is True
 
 
 def test_connection_is_read_only(con):
@@ -117,7 +118,7 @@ def test_pages_render_without_error(db, page, monkeypatch):
     at = AppTest.from_file(str(ROOT / page), default_timeout=60).run()
     assert not at.exception, at.exception
     text = " ".join(m.value for m in at.markdown) + " ".join(c.value for c in at.caption)
-    assert copy.ATTRIBUTION in text and copy.DISCLAIMER in text
+    assert copy.ATTRIBUTION in text and copy.DISCLAIMER in text and copy.REFRESH_NOTE in text
 
 
 def test_missing_values_show_as_not_available():

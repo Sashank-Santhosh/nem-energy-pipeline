@@ -76,7 +76,7 @@ def latest_interval(con) -> pd.Timestamp:
                         .fetchone()[0])
 
 
-def is_stale(latest: pd.Timestamp, now: pd.Timestamp, max_age_hours: int = 3) -> bool:
+def is_stale(latest: pd.Timestamp, now: pd.Timestamp, max_age_hours: int = 12) -> bool:
     return (now - latest) > pd.Timedelta(hours=max_age_hours)
 
 
