@@ -8,7 +8,7 @@ import pandas as pd
 from forecast import model, store
 from forecast.backtest import _days
 from forecast.data import Inputs
-from forecast.features import FEATURES, ISSUE_HOUR, issue_time_for
+from forecast.features import FEATURES, ISSUE_HOUR, REQUIRED, issue_time_for
 from ingest.sources import REGIONS
 
 log = logging.getLogger(__name__)
@@ -23,10 +23,10 @@ def forecast_region(con, region: str, now: pd.Timestamp) -> pd.DataFrame | None:
         return None
     first = inp.demand.index.min().date() + timedelta(days=8)
     history = [inp.day(d, "archive") for d in _days(first, target - timedelta(days=2))]
-    train = pd.concat(history).dropna(subset=FEATURES + ["actual_mw"]) if history else None
+    train = pd.concat(history).dropna(subset=REQUIRED + ["actual_mw"]) if history else None
     f = inp.day(target, "forecast", fetched_before=issue)
-    if train is None or train.empty or f[FEATURES].isna().any().any():
-        missing = [c for c in FEATURES if f[c].isna().any()]
+    if train is None or train.empty or f[REQUIRED].isna().any().any():
+        missing = [c for c in REQUIRED if f[c].isna().any()]
         log.warning("%s: missing inputs %s for %s, skipped", region, missing or "history", target)
         return None
     m = model.train(train[FEATURES], train["actual_mw"])

@@ -6,7 +6,7 @@ import pandas as pd
 
 from forecast import model
 from forecast.data import Inputs
-from forecast.features import FEATURES, issue_time_for
+from forecast.features import FEATURES, REQUIRED, issue_time_for
 
 COLUMNS = ["regionid", "issue_time", "target_time", "actual_mw", "model_mw", "naive_mw", "aemo_mw"]
 
@@ -23,11 +23,11 @@ def rolling_backtest(con, region: str, start: date, end: date, refit_days: int =
     for block_start in _days(start, end)[::refit_days]:
         issue0 = issue_time_for(block_start)
         train = pd.concat([f for d, f in history.items() if f.index.max() <= issue0])
-        train = train.dropna(subset=FEATURES + ["actual_mw"])
+        train = train.dropna(subset=REQUIRED + ["actual_mw"])
         m = model.train(train[FEATURES], train["actual_mw"])
         for d in _days(block_start, min(block_start + timedelta(days=refit_days - 1), end)):
             f = inp.day(d, "historical_forecast")
-            f = f.dropna(subset=FEATURES)
+            f = f.dropna(subset=REQUIRED)
             if f.empty:
                 continue
             out.append(pd.DataFrame({

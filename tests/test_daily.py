@@ -84,3 +84,18 @@ def test_daily_if_due_runs_once_after_issue_time(db):
         assert daily.run_if_due(con, pd.Timestamp("2026-11-09 13:07")) == 240
         assert daily.run_if_due(con, pd.Timestamp("2026-11-09 14:07")) == 0  # already done today
         assert con.execute("select count(*) from forecasts.daily").fetchone()[0] == 240
+
+
+def test_daily_forecasts_despite_one_missing_reading(db):
+    # One absent AEMO file leaves a hole in the demand history. Forecasts for the days that
+    # look back at that half-hour (2 and 7 days later) must still be made.
+    with duckdb.connect(str(db)) as con:
+        con.execute("delete from raw.dispatch_regionsum where settlementdate = '2026/11/08 17:50:00'")
+    run_dbt(db)
+    with duckdb.connect(str(db)) as con:
+        hole = con.execute("select count(*) from marts.fct_demand_half_hourly "
+                           "where period_end = '2026-11-08 18:00:00'").fetchone()[0]
+        out = daily.run_daily(con, NOW)  # target 2026-11-10; its 18:00 looks back to the hole
+    assert hole == 0
+    assert len(out) == 240
+    assert out["model_mw"].notna().all()

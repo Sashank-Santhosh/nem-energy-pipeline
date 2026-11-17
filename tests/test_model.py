@@ -71,3 +71,11 @@ def test_train_is_deterministic():
     p1 = model.predict(model.train(X, y), X)
     p2 = model.predict(model.train(X, y), X)
     assert p1.tolist() == pytest.approx(p2.tolist())
+
+
+def test_backtest_keeps_days_whose_lag_input_is_missing():
+    con = make_db()
+    con.execute("delete from marts.fct_demand_half_hourly where period_end = '2026-10-18 12:00:00'")
+    out = backtest.rolling_backtest(con, "SA1", date(2026, 10, 20), date(2026, 10, 20))
+    assert len(out) == 48  # the 12:00 target looks back to the hole and is still forecast
+    assert out["model_mw"].notna().all()

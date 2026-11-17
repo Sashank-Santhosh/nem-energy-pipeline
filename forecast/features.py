@@ -15,6 +15,9 @@ HALF_HOUR = pd.Timedelta(minutes=30)
 ISSUE_HOUR = 13
 FEATURES = ["half_hour", "dow", "month", "is_holiday", "temp_c", "temp_c_sq",
             "lag_2d_mw", "lag_7d_mw"]
+# The only inputs a forecast cannot go ahead without. A missing lag (one absent AEMO file)
+# is fine: LightGBM treats it as "unknown", so one hole must not cost a whole region-day.
+REQUIRED = ["temp_c"]
 
 
 class LeakageError(ValueError):
