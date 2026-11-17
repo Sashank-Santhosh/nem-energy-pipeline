@@ -24,11 +24,13 @@ ACCURACY_COLS = ["regionid", "source", "period", "mae_mw", "mape_pct"]
 
 DOWNLOAD_DIR = Path(tempfile.gettempdir())
 _current: dict = {}  # the downloaded copy in use: {"path": Path, "con": connection}
+# Last cycle's copy, kept open one more cycle: a visitor in the middle of a page may still hold
+# a cursor from it, and a cursor stops working the moment its connection is closed.
+_previous: dict = {}
 
 
 def _download(url: str) -> Path:
-    """Download to a fresh file, then switch to it; the previous copy is closed and deleted,
-    so hourly refreshes never pile up copies on disk."""
+    """Download to a fresh file. Only the two newest copies stay on disk (see get_connection)."""
     new = DOWNLOAD_DIR / f"nem-dashboard-{os.getpid()}-{os.urandom(4).hex()}.duckdb"
     # The release keeps the previous upload as nem-prev.duckdb; use it if the current copy is
     # mid-swap or missing.
@@ -52,11 +54,14 @@ def get_connection(path: str | None = None) -> duckdb.DuckDBPyConnection:
         return duckdb.connect(path, read_only=True)
     new = _download(default_db_url())
     con = duckdb.connect(str(new), read_only=True)
-    old = _current.copy()
+    retired = _previous.copy()
+    _previous.clear()
+    _previous.update(_current)
+    _current.clear()
     _current.update(path=new, con=con)
-    if old:
-        old["con"].close()
-        Path(old["path"]).unlink(missing_ok=True)
+    if retired:
+        retired["con"].close()
+        Path(retired["path"]).unlink(missing_ok=True)
     return con
 
 

@@ -137,7 +137,7 @@ def test_accuracy_scores_all_sources_on_the_same_rows(con):
     assert rows and all(n == complete for _, _, n, complete in rows)
 
 
-def test_hourly_refresh_reuses_disk_and_closes_old_connection(db, tmp_path, monkeypatch):
+def test_refresh_keeps_the_previous_copy_open_for_one_cycle(db, tmp_path, monkeypatch):
     payload = Path(db).read_bytes()
 
     class Resp:
@@ -157,13 +157,55 @@ def test_hourly_refresh_reuses_disk_and_closes_old_connection(db, tmp_path, monk
     monkeypatch.setenv("NEM_DB_URL", "https://example.invalid/nem.duckdb")
     monkeypatch.setattr(data.requests, "get", lambda *a, **k: Resp())
     monkeypatch.setattr(data, "DOWNLOAD_DIR", tmp_path)
+    monkeypatch.setattr(data, "_current", {})
+    monkeypatch.setattr(data, "_previous", {}, raising=False)
+    count = "select count(*) from marts.fct_region_interval"
     first = data.get_connection()
     second = data.get_connection()
+    # A visitor in the middle of a page may still hold a cursor from the first copy.
+    assert first.cursor().execute(count).fetchone()[0] > 0
+    third = data.get_connection()
     with pytest.raises(duckdb.Error):
-        first.execute("select 1")  # closed
-    assert second.execute("select count(*) from marts.fct_region_interval").fetchone()[0] > 0
-    assert len(list(tmp_path.glob("*.duckdb"))) == 1
+        first.execute("select 1")  # retired one cycle later: closed
+    assert second.cursor().execute(count).fetchone()[0] > 0
+    assert len(list(tmp_path.glob("*.duckdb"))) == 2  # only the two newest copies stay on disk
     second.close()
+    third.close()
+
+
+def test_visitors_get_their_own_cursor_so_threads_do_not_collide(tmp_path, monkeypatch):
+    import threading
+
+    import streamlit as st
+
+    from dashboard import ui
+
+    path = tmp_path / "t.duckdb"
+    with duckdb.connect(str(path)) as c:
+        c.execute("create schema marts")
+        c.execute("create table marts.t as select range as i, range % 5 as g from range(5000)")
+    monkeypatch.setattr(data, "get_connection", lambda p=None: duckdb.connect(str(path), read_only=True))
+    st.cache_resource.clear()
+    errors = []
+
+    def visitor():
+        con = ui.connection()  # what every page does once per run
+        for _ in range(40):
+            try:
+                n = con.execute("select count(*) from marts.t").fetchone()[0]
+                df = con.execute("select g, avg(i) from marts.t group by g order by g").df()
+                if n != 5000 or len(df) != 5:
+                    errors.append("wrong result")
+            except Exception as e:  # noqa: BLE001 - any failure is what we are counting
+                errors.append(type(e).__name__)
+
+    threads = [threading.Thread(target=visitor) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    st.cache_resource.clear()
+    assert errors == [], f"{len(errors)} problems, e.g. {errors[:3]}"
 
 
 def test_download_falls_back_to_previous_copy(tmp_path, monkeypatch):

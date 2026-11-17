@@ -18,8 +18,15 @@ def fmt(value, pattern: str) -> str:
 
 
 @st.cache_resource(ttl=3600)
-def connection():
+def _shared_connection():
     return data.get_connection()
+
+
+def connection():
+    """A private cursor onto the shared database. Visitors run in separate threads, and one DuckDB
+    connection used by several threads at once raises "connection is busy" and can return wrong
+    results; a cursor per page run is safe."""
+    return _shared_connection().cursor()
 
 
 def region_picker(default: str = "SA1") -> str:
