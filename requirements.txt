@@ -1,7 +1,9 @@
 # Dashboard-only dependencies for Streamlit Community Cloud (the build and forecast tools
 # live in pyproject.toml and are not needed to show the dashboard).
-streamlit>=1.50
-plotly>=5.24
-duckdb>=1.1
-pandas>=2.2
-requests>=2.32
+# duckdb: a database file written by a newer DuckDB cannot be opened by an older one, so its
+# floor must match the version in uv.lock (tests/test_deploy.py enforces this).
+streamlit>=1.50,<2
+plotly>=5.24,<8
+duckdb>=2.0.0,<3
+pandas>=2.2,<4
+requests>=2.32,<3

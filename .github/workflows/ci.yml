@@ -19,3 +19,7 @@ jobs:
       - run: uv run dbt build --project-dir dbt --profiles-dir dbt
         env:
           NEM_DB: data/ci.duckdb
+      - name: Dashboard works with only the hosted requirements
+        run: >-
+          uv run --isolated --no-project --python 3.12 --with-requirements requirements.txt
+          python scripts/check_dashboard.py data/ci.duckdb
